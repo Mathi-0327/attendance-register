@@ -1,0 +1,22 @@
+# Normalize line endings for text files
+* text=auto
+
+# Treat common source files as text
+*.js text
+*.ts text
+*.tsx text
+*.jsx text
+*.css text
+*.html text
+*.json text
+
+# Mark binary formats explicitly
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+
+# Ensure node_modules files are not treated as text to avoid LF/CRLF conversion warnings
+node_modules/** -text

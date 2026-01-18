@@ -1,0 +1,231 @@
+🚀 ATTENDANCE REGISTER – COMPLETE WORKFLOW
+1️⃣ System Setup (Host Side)
+1. Host starts the server
+
+Host connects to a Wi-Fi network
+
+Runs the attendance server (Node.js / Python)
+
+Server listens on LAN IP (ex: 192.168.1.5:5000)
+
+2. Admin Dashboard is activated
+
+Accessed only by host
+
+Protected by password
+
+Dashboard includes:
+
+Start/Stop attendance session
+
+View live attendance
+
+Export to Google Slides
+
+Manage users
+
+2️⃣ Client Access (Student/Employee Side)
+1. User opens attendance webpage
+
+They open:
+
+http://<host-ip>:5000/attendance
+
+
+Example:
+
+http://192.168.1.5:5000/attendance
+
+2. Secure Local Access
+
+Only users connected to the same Wi-Fi can access.
+External users are blocked.
+
+3. User submits attendance
+
+User enters:
+
+Name / ID
+
+Optional: Roll number / Department
+
+On submit, system automatically captures:
+
+User IP address
+
+User Agent (Browser/device info)
+
+Timestamp
+
+Attendance session ID
+
+4. Success Page
+
+User sees:
+
+"Attendance Recorded Successfully"
+
+Optional animation (tick mark)
+
+3️⃣ Backend Processing
+
+When a user submits attendance:
+
+✔ Data Validation
+
+Session must be active
+
+User must not have submitted already
+
+IP duplication check
+
+Fake submissions blocked
+
+✔ Data Saved to Local Database
+
+Saved fields:
+
+Name / ID
+
+IP Address
+
+Exact Time
+
+Browser / Device
+
+Status: Present
+
+✔ Entry pushed to Google Slides (Optional Real-time)
+
+System sends data to Google Slides API.
+
+4️⃣ Google Slides Reporting Workflow
+1. System connects using Service Account
+
+Google Slides API
+
+Google Drive API
+
+Auth via service account JSON
+
+2. Finds the Report File
+
+Pre-created Google Slides file
+
+Shared with service account email
+
+3. Creates a new slide
+
+For each day:
+
+New slide is automatically created
+
+4. Inserts attendance table
+
+The slide contains:
+
+Name	IP Address	Time	Device
+5. Style applied
+
+Text formatted
+
+Table aligned
+
+Title: “Attendance Report – <Date>”
+
+6. Slides sync back to Google account
+
+Admin can view them anytime online.
+
+5️⃣ Admin Dashboard Features
+
+Admin has full privileges:
+
+✔ View Live Attendance
+
+Shows list as they submit.
+
+✔ Manually Generate Slides
+
+Button: “Export Today’s Attendance to Google Slides”
+
+✔ Start / Stop Session
+
+Attendance ON → Students can submit
+
+Attendance OFF → Page locked
+
+✔ Export Options
+
+Export to Google Slides
+
+Export to PDF
+
+Export to Excel
+
+Export to CSV
+
+✔ Manage Users
+
+Add/Delete students
+
+View past attendance
+
+6️⃣ Daily Automation (Optional)
+
+A cron job runs daily:
+
+✔ Auto-create new day slide
+✔ Auto-reset attendance list
+✔ Backup yesterday’s data to Google Drive
+✔ Email summary to admin
+7️⃣ Security Workflow
+✔ Only Host = Full Access
+
+Dashboard is locked using:
+
+Password
+
+IP validation: Only host IP allowed
+
+✔ Clients = Limited Access
+
+They cannot:
+
+View attendance list
+
+Modify data
+
+Generate reports
+
+Access admin panel
+
+✔ Anti-fraud checks
+
+IP-based limit
+
+Device lock
+
+Duplicate submission block
+
+Time window restriction
+
+8️⃣ End-of-Day Workflow
+
+Admin clicks:
+
+Generate Report
+
+Download Summary
+
+Close Session
+
+Google Slides updated with:
+
+Date
+
+Total students
+
+Attendance list
+
+Stat graph (optiona
