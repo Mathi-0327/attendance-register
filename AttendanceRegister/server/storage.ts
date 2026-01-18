@@ -18,6 +18,7 @@ export interface IStorage {
   getStudentById(studentId: string): Promise<Student | undefined>;
   createStudent(student: InsertStudent): Promise<Student>;
   getAllStudents(): Promise<Student[]>;
+  deleteStudent(id: number): Promise<boolean>;
 
   // Attendance methods
   createAttendanceRecord(record: InsertAttendance): Promise<AttendanceRecord>;
@@ -78,6 +79,11 @@ export class DatabaseStorage implements IStorage {
 
   async getAllStudents(): Promise<Student[]> {
     return await db.select().from(students).orderBy(desc(students.createdAt));
+  }
+
+  async deleteStudent(id: number): Promise<boolean> {
+    const result = await db.delete(students).where(eq(students.id, id)).returning();
+    return result.length > 0;
   }
 
   async createAttendanceRecord(record: InsertAttendance): Promise<AttendanceRecord> {

@@ -150,6 +150,71 @@ export async function registerRoutes(
     }
   });
 
+  // --- Admin Specific Routes (called directly from AdminDashboard.tsx) ---
+
+  // Admin: Get all students
+  app.get("/api/admin/students", async (_req: Request, res: Response) => {
+    try {
+      const students = await storage.getAllStudents();
+      res.json({ students });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch students" });
+    }
+  });
+
+  // Admin: Delete a student
+  app.delete("/api/admin/students/:studentId", async (req: Request, res: Response) => {
+    try {
+      const { studentId } = req.params;
+      const student = await storage.getStudentById(studentId);
+      if (!student) {
+        return res.status(404).json({ error: "Student not found" });
+      }
+      // Assuming storage has a deleteStudent method or similar, 
+      // but let's check or implement if missing. 
+      // For now, let's assume we need to add it to IStorage.
+      await storage.deleteStudent(student.id);
+      res.json({ message: "Student deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete student" });
+    }
+  });
+
+  // Admin: Get all sessions (history)
+  app.get("/api/admin/sessions", async (_req: Request, res: Response) => {
+    try {
+      const sessions = await storage.getAllSessions();
+      res.json({ sessions });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sessions" });
+    }
+  });
+
+  // Admin: Get Stats
+  app.get("/api/admin/stats", async (_req: Request, res: Response) => {
+    try {
+      const records = await storage.getAllAttendanceRecords();
+      const total = records.length;
+      const present = records.filter(r => r.status === 'present').length;
+      const late = records.filter(r => r.status === 'late').length;
+
+      const departmentBreakdown = records.reduce((acc: any, r) => {
+        const dept = r.department || 'Other';
+        acc[dept] = (acc[dept] || 0) + 1;
+        return acc;
+      }, {});
+
+      res.json({
+        total,
+        present,
+        late,
+        departmentBreakdown
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
   // Clear Records
   app.delete("/api/attendance", async (_req: Request, res: Response) => {
     try {
@@ -210,3 +275,4 @@ export async function registerRoutes(
 
   return httpServer;
 }
+
