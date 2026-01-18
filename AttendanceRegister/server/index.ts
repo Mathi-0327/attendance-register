@@ -20,6 +20,16 @@ import {
 const app = express();
 const httpServer = createServer(app);
 
+export function log(message: string, source = "express") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
@@ -27,16 +37,21 @@ declare module "http" {
 }
 
 // Security middleware (apply early, in order)
-app.use(requestIdMiddleware); // Add request IDs first for tracking
-app.use(corsMiddleware); // CORS before other security checks
-app.use(ipFilterMiddleware); // IP filtering early
-app.use("/api", requestValidationMiddleware); // Validate request patterns
-app.use("/api", anomalyDetectionMiddleware); // Detect suspicious patterns
-app.use(securityHeadersMiddleware); // Security headers
-app.use(requestSizeMiddleware); // Request size limits
-app.use(timeoutMiddleware(30000)); // 30 second timeout
+app.use(requestIdMiddleware);
+app.use(corsMiddleware);
 
-// Configure session middleware for production-ready hosting
+// Only use IP filtering if NOT in production
+if (process.env.NODE_ENV !== "production") {
+  app.use(ipFilterMiddleware);
+}
+
+app.use("/api", requestValidationMiddleware);
+app.use("/api", anomalyDetectionMiddleware);
+app.use(securityHeadersMiddleware);
+app.use(requestSizeMiddleware);
+app.use(timeoutMiddleware(30000));
+
+// Configure session middleware
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "attendance-register-secret",
@@ -45,17 +60,16 @@ app.use(
     store: storage.sessionStore,
     cookie: {
       secure: process.env.NODE_ENV === "production",
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 24 * 60 * 60 * 1000,
     },
   })
 );
 
-// Apply general rate limiting to all routes
 app.use(rateLimitMiddleware());
 
 app.use(
   express.json({
-    limit: "10kb", // Enforce 10KB limit
+    limit: "10kb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
@@ -63,17 +77,6 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false, limit: "10kb" }));
-
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -93,40 +96,32 @@ app.use((req, res, next) => {
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
       log(logLine);
     }
   });
-
   next();
 });
 
 (async () => {
-  await registerRoutes(httpServer, app);
+  try {
+    log("Starting server initialization...");
+    await registerRoutes(httpServer, app);
 
-  // Use secure error handler
-  app.use(secureErrorHandler);
+    app.use(secureErrorHandler);
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
+    if (process.env.NODE_ENV === "production") {
+      serveStatic(app);
+    } else {
+      const { setupVite } = await import("./vite");
+      await setupVite(httpServer, app);
+    }
+
+    const port = parseInt(process.env.PORT || "5000", 10);
+    httpServer.listen(port, "0.0.0.0", () => {
+      log(`Server successfully listening on port ${port}`);
+    });
+  } catch (error) {
+    console.error("FATAL ERROR DURING STARTUP:", error);
+    process.exit(1);
   }
-
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    port,
-    "0.0.0.0",
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
 })();
