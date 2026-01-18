@@ -1,108 +1,135 @@
-import { type User, type InsertUser, type AttendanceRecord, type InsertAttendance } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { users, sessions, attendanceRecords, students, type User, type InsertUser, type AttendanceRecord, type InsertAttendance, type Session, type InsertSession, type Student, type InsertStudent } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
+import { dbPool } from "./db";
 
-// modify the interface with any CRUD methods
-// you might need
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
+  // User methods
+  getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+
+  // Student methods
+  getStudent(id: number): Promise<Student | undefined>;
+  getStudentById(studentId: string): Promise<Student | undefined>;
+  createStudent(student: InsertStudent): Promise<Student>;
+  getAllStudents(): Promise<Student[]>;
+
   // Attendance methods
   createAttendanceRecord(record: InsertAttendance): Promise<AttendanceRecord>;
   getAllAttendanceRecords(): Promise<AttendanceRecord[]>;
-  getAttendanceRecordById(id: string): Promise<AttendanceRecord | undefined>;
-  deleteAttendanceRecord(id: string): Promise<boolean>;
+  getAttendanceRecordById(id: number): Promise<AttendanceRecord | undefined>;
+  deleteAttendanceRecord(id: number): Promise<boolean>;
   clearAllRecords(): Promise<void>;
+
   // Session management
-  isSessionActive(): boolean;
-  setSessionActive(active: boolean): void;
-  // Per-session device claiming: the device that is allowed to submit during the active session
-  getSessionClaimingDevice(): string | null;
-  setSessionClaimingDevice(deviceId: string | null): void;
+  getSession(id: number): Promise<Session | undefined>;
+  getActiveSession(): Promise<Session | undefined>;
+  createSession(session: InsertSession): Promise<Session>;
+  updateSession(id: number, active: boolean, endTime?: Date): Promise<Session>;
+  getAllSessions(): Promise<Session[]>;
+
+  sessionStore: session.Store;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private attendanceRecords: Map<string, AttendanceRecord>;
-  private sessionActive: boolean;
-  // Which device has claimed the current active session (null = no claim yet)
-  private sessionClaimingDevice: string | null;
+export class DatabaseStorage implements IStorage {
+  sessionStore: session.Store;
 
   constructor() {
-    this.users = new Map();
-    this.attendanceRecords = new Map();
-    this.sessionActive = false; // Start with session inactive
-    this.sessionClaimingDevice = null;
+    this.sessionStore = new PostgresSessionStore({
+      pool: dbPool,
+      createTableIfMissing: true,
+    });
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
 
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  async getStudent(id: number): Promise<Student | undefined> {
+    const [student] = await db.select().from(students).where(eq(students.id, id));
+    return student;
+  }
+
+  async getStudentById(studentId: string): Promise<Student | undefined> {
+    const [student] = await db.select().from(students).where(eq(students.studentId, studentId));
+    return student;
+  }
+
+  async createStudent(insertStudent: InsertStudent): Promise<Student> {
+    const [student] = await db.insert(students).values(insertStudent).returning();
+    return student;
+  }
+
+  async getAllStudents(): Promise<Student[]> {
+    return await db.select().from(students).orderBy(desc(students.createdAt));
+  }
+
   async createAttendanceRecord(record: InsertAttendance): Promise<AttendanceRecord> {
-    const id = randomUUID();
-    const attendanceRecord: AttendanceRecord = {
-      ...record,
-      id,
-      timestamp: new Date(),
-    };
-    this.attendanceRecords.set(id, attendanceRecord);
+    const [attendanceRecord] = await db.insert(attendanceRecords).values(record).returning();
     return attendanceRecord;
   }
 
   async getAllAttendanceRecords(): Promise<AttendanceRecord[]> {
-    return Array.from(this.attendanceRecords.values())
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return await db.select().from(attendanceRecords).orderBy(desc(attendanceRecords.timestamp));
   }
 
-  async getAttendanceRecordById(id: string): Promise<AttendanceRecord | undefined> {
-    return this.attendanceRecords.get(id);
+  async getAttendanceRecordById(id: number): Promise<AttendanceRecord | undefined> {
+    const [record] = await db.select().from(attendanceRecords).where(eq(attendanceRecords.id, id));
+    return record;
   }
 
-  async deleteAttendanceRecord(id: string): Promise<boolean> {
-    return this.attendanceRecords.delete(id);
+  async deleteAttendanceRecord(id: number): Promise<boolean> {
+    const result = await db.delete(attendanceRecords).where(eq(attendanceRecords.id, id)).returning();
+    return result.length > 0;
   }
 
   async clearAllRecords(): Promise<void> {
-    this.attendanceRecords.clear();
+    await db.delete(attendanceRecords);
   }
 
-  isSessionActive(): boolean {
-    return this.sessionActive;
+  async getSession(id: number): Promise<Session | undefined> {
+    const [session] = await db.select().from(sessions).where(eq(sessions.id, id));
+    return session;
   }
 
-  setSessionActive(active: boolean): void {
-    this.sessionActive = active;
-    // When a new session becomes active, reset the claiming device so first submit can claim it.
-    // When session becomes inactive, also clear the claim.
-    if (!active) {
-      this.sessionClaimingDevice = null;
-    } else {
-      this.sessionClaimingDevice = null;
-    }
+  async getActiveSession(): Promise<Session | undefined> {
+    const [session] = await db.select().from(sessions).where(eq(sessions.isActive, true));
+    return session;
   }
 
-  getSessionClaimingDevice(): string | null {
-    return this.sessionClaimingDevice;
+  async createSession(insertSession: InsertSession): Promise<Session> {
+    const [session] = await db.insert(sessions).values(insertSession).returning();
+    return session;
   }
 
-  setSessionClaimingDevice(deviceId: string | null): void {
-    this.sessionClaimingDevice = deviceId;
+  async updateSession(id: number, active: boolean, endTime?: Date): Promise<Session> {
+    const [updatedSession] = await db
+      .update(sessions)
+      .set({ isActive: active, endTime: endTime })
+      .where(eq(sessions.id, id))
+      .returning();
+    return updatedSession;
+  }
+
+  async getAllSessions(): Promise<Session[]> {
+    return await db.select().from(sessions).orderBy(desc(sessions.startTime));
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

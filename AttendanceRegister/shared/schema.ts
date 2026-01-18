@@ -1,10 +1,9 @@
-import { sql } from "drizzle-orm";
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { pgTable, text, serial, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = sqliteTable("users", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
 });
@@ -18,27 +17,27 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 // Sessions Schema
-export const sessions = sqliteTable("sessions", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+export const sessions = pgTable("sessions", {
+  id: serial("id").primaryKey(),
   name: text("name"),
-  startTime: integer("start_time", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-  endTime: integer("end_time", { mode: "timestamp" }),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  startTime: timestamp("start_time").notNull().defaultNow(),
+  endTime: timestamp("end_time"),
+  isActive: boolean("is_active").notNull().default(true),
 });
 
 export type Session = typeof sessions.$inferSelect;
 export type InsertSession = typeof sessions.$inferInsert;
 
 // Attendance Records Schema
-export const attendanceRecords = sqliteTable("attendance_records", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  sessionId: text("session_id").references(() => sessions.id),
+export const attendanceRecords = pgTable("attendance_records", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => sessions.id),
   name: text("name").notNull(),
   studentId: text("student_id").notNull(),
   department: text("department"),
   ipAddress: text("ip_address").notNull(),
   device: text("device").notNull(),
-  timestamp: integer("timestamp", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
   status: text("status").default("present").notNull(),
 });
 
@@ -57,8 +56,8 @@ export type InsertAttendance = z.infer<typeof insertAttendanceSchema>;
 export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
 
 // Student Profile Schema
-export const students = sqliteTable("students", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+export const students = pgTable("students", {
+  id: serial("id").primaryKey(),
   studentId: text("student_id").notNull().unique(),
   name: text("name").notNull(),
   email: text("email"),
@@ -66,7 +65,7 @@ export const students = sqliteTable("students", {
   department: text("department"),
   year: text("year"),
   password: text("password").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertStudentSchema = createInsertSchema(students).pick({
@@ -105,3 +104,4 @@ export const attendanceFormSchema = z.object({
   studentId: z.string().min(3, "ID is required"),
   department: z.string().optional(),
 });
+

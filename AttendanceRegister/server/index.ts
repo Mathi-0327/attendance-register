@@ -1,7 +1,9 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { storage } from "./storage";
 import {
   securityHeadersMiddleware,
   requestSizeMiddleware,
@@ -33,6 +35,20 @@ app.use("/api", anomalyDetectionMiddleware); // Detect suspicious patterns
 app.use(securityHeadersMiddleware); // Security headers
 app.use(requestSizeMiddleware); // Request size limits
 app.use(timeoutMiddleware(30000)); // 30 second timeout
+
+// Configure session middleware for production-ready hosting
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "attendance-register-secret",
+    resave: false,
+    saveUninitialized: false,
+    store: storage.sessionStore,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  })
+);
 
 // Apply general rate limiting to all routes
 app.use(rateLimitMiddleware());
