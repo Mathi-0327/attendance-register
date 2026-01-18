@@ -13,10 +13,10 @@ let networkConfig: NetworkConfig | null = null;
  */
 export function getServerLocalIp(): string {
   const interfaces = networkInterfaces();
-  
+
   // Priority order: look for common local network interfaces
   const priorityOrder = ["Wi-Fi", "Ethernet", "eth0", "wlan0", "en0"];
-  
+
   for (const priority of priorityOrder) {
     for (const [name, addrs] of Object.entries(interfaces)) {
       if (name.toLowerCase().includes(priority.toLowerCase())) {
@@ -28,7 +28,7 @@ export function getServerLocalIp(): string {
       }
     }
   }
-  
+
   // Fallback: find any non-internal IPv4 address
   for (const addrs of Object.values(interfaces)) {
     for (const addr of addrs || []) {
@@ -37,7 +37,7 @@ export function getServerLocalIp(): string {
       }
     }
   }
-  
+
   // Last resort: return localhost
   return "127.0.0.1";
 }
@@ -61,20 +61,20 @@ export function isSameNetwork(clientIp: string, serverIp: string): boolean {
   if (clientIp === "127.0.0.1" || clientIp === "::1" || clientIp === "::ffff:127.0.0.1") {
     return true;
   }
-  
+
   // Handle IPv4-mapped IPv6 addresses
   if (clientIp.startsWith("::ffff:")) {
     clientIp = clientIp.substring(7);
   }
-  
+
   // Remove IPv6 prefix if present
   if (clientIp.includes("::")) {
     return false; // IPv6 addresses from different networks
   }
-  
+
   const clientPrefix = getNetworkPrefix(clientIp);
   const serverPrefix = getNetworkPrefix(serverIp);
-  
+
   return clientPrefix === serverPrefix;
 }
 
@@ -85,18 +85,18 @@ export function getNetworkConfig(): NetworkConfig {
   if (!networkConfig) {
     const serverIp = getServerLocalIp();
     const networkPrefix = getNetworkPrefix(serverIp);
-    
+
     networkConfig = {
       serverIp,
       networkPrefix,
       allowedSubnet: `${networkPrefix}.0/24`,
     };
-    
+
     console.log(`[network] Server IP: ${serverIp}`);
     console.log(`[network] Network prefix: ${networkPrefix}`);
     console.log(`[network] Allowed subnet: ${networkConfig.allowedSubnet}`);
   }
-  
+
   return networkConfig;
 }
 
@@ -104,19 +104,24 @@ export function getNetworkConfig(): NetworkConfig {
  * Validate if a client IP is allowed (same network)
  */
 export function validateClientIp(clientIp: string): { allowed: boolean; reason?: string } {
+  // Always allow in production (cloud hosting)
+  if (process.env.NODE_ENV === "production") {
+    return { allowed: true };
+  }
+
   const config = getNetworkConfig();
-  
+
   if (!clientIp || clientIp === "unknown") {
     return { allowed: false, reason: "Could not determine client IP address" };
   }
-  
+
   if (!isSameNetwork(clientIp, config.serverIp)) {
     return {
       allowed: false,
       reason: `Access denied: Client IP (${clientIp}) is not on the same network as server (${config.serverIp}). Only devices on the same Wi-Fi network can access this system.`,
     };
   }
-  
+
   return { allowed: true };
 }
 

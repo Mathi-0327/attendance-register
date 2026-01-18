@@ -21,7 +21,7 @@ class WSServer {
       // Get client IP from WebSocket request
       const clientIp = this.getClientIp(req);
       const validation = validateClientIp(clientIp);
-      
+
       // For WebSocket, we allow connections but log warnings for external IPs
       // The actual API endpoints will block them
       if (!validation.allowed) {
@@ -30,7 +30,7 @@ class WSServer {
       } else {
         console.log(`[websocket] Client connected from ${clientIp}. Total clients: ${this.clients.size}`);
       }
-      
+
       this.clients.add(ws);
 
       // Send initial data to newly connected client
@@ -62,16 +62,19 @@ class WSServer {
   private async sendInitialData(ws: WebSocket) {
     try {
       const records = await storage.getAllAttendanceRecords();
-      const sessionActive = storage.isSessionActive();
-      
+      const activeSession = await storage.getActiveSession();
+      const sessionActive = !!activeSession;
+
       const message: WebSocketMessage = {
         type: "initial_data",
         data: {
           records,
           sessionActive,
+          activeSession,
         },
       };
-      
+
+
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(message));
       }
