@@ -190,11 +190,18 @@ export async function registerRoutes(
     }
   });
 
-  // Admin: Get all sessions (history)
+  // Admin: Get all sessions (history) with their records
   app.get("/api/admin/sessions", async (_req: Request, res: Response) => {
     try {
-      const sessions = await storage.getAllSessions();
-      res.json({ sessions });
+      const allSessions = await storage.getAllSessions();
+      const allRecords = await storage.getAllAttendanceRecords();
+
+      const sessionsWithRecords = allSessions.map(session => ({
+        ...session,
+        records: allRecords.filter(r => r.sessionId === session.id)
+      }));
+
+      res.json({ sessions: sessionsWithRecords });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch sessions" });
     }

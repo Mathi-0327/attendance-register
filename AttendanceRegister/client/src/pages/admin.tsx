@@ -66,6 +66,7 @@ export default function AdminDashboard() {
   const [activeView, setActiveView] = useState<"attendance" | "students" | "sessions">("attendance");
   const [sessions, setSessions] = useState<any[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [selectedSessionForDetails, setSelectedSessionForDetails] = useState<any>(null);
 
   // Load sessions
   const loadSessions = async () => {
@@ -621,6 +622,8 @@ export default function AdminDashboard() {
                         <TableHead>Start Time</TableHead>
                         <TableHead>End Time</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Students</TableHead>
+                        <TableHead>Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -637,12 +640,59 @@ export default function AdminDashboard() {
                               {session.isActive ? "Active" : "Closed"}
                             </Badge>
                           </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{session.records?.length || 0} Present</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedSessionForDetails(session)}>
+                              View Students
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
               )}
+              <Dialog open={!!selectedSessionForDetails} onOpenChange={(open) => !open && setSelectedSessionForDetails(null)}>
+                <DialogContent className="max-w-3xl">
+                  <DialogHeader>
+                    <DialogTitle>{selectedSessionForDetails?.name || "Session Details"}</DialogTitle>
+                    <DialogDescription>
+                      Date: {selectedSessionForDetails && format(new Date(selectedSessionForDetails.startTime), "MMM dd, yyyy")} |
+                      Total: {selectedSessionForDetails?.records?.length || 0} Students
+                    </DialogDescription>
+                  </DialogHeader>
+                  <ScrollArea className="max-h-[60vh]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Student ID</TableHead>
+                          <TableHead>Department</TableHead>
+                          <TableHead>Time</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedSessionForDetails?.records?.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-4">No attendance recorded</TableCell>
+                          </TableRow>
+                        ) : (
+                          selectedSessionForDetails?.records?.map((record: any) => (
+                            <TableRow key={record.id}>
+                              <TableCell className="font-medium">{record.name}</TableCell>
+                              <TableCell>{record.studentId}</TableCell>
+                              <TableCell>{record.department || 'N/A'}</TableCell>
+                              <TableCell className="text-sm font-mono">{format(new Date(record.timestamp), "HH:mm:ss")}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         ) : (
