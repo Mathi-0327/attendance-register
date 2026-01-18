@@ -104,11 +104,6 @@ export function getNetworkConfig(): NetworkConfig {
  * Validate if a client IP is allowed (same network)
  */
 export function validateClientIp(clientIp: string): { allowed: boolean; reason?: string } {
-  // Always allow in production (cloud hosting)
-  if (process.env.NODE_ENV === "production") {
-    return { allowed: true };
-  }
-
   const config = getNetworkConfig();
 
   if (!clientIp || clientIp === "unknown") {
@@ -124,4 +119,3 @@ export function validateClientIp(clientIp: string): { allowed: boolean; reason?:
 
   return { allowed: true };
 }
-

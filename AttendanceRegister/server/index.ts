@@ -40,10 +40,8 @@ declare module "http" {
 app.use(requestIdMiddleware);
 app.use(corsMiddleware);
 
-// Only use IP filtering if NOT in production
-if (process.env.NODE_ENV !== "production") {
-  app.use(ipFilterMiddleware);
-}
+// STRICT SECURITY: Always filter by IP (Same Network Check)
+app.use(ipFilterMiddleware);
 
 app.use("/api", requestValidationMiddleware);
 app.use("/api", anomalyDetectionMiddleware);
@@ -59,7 +57,7 @@ app.use(
     saveUninitialized: false,
     store: storage.sessionStore,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: false, // Set to false for local network access (HTTP)
       maxAge: 24 * 60 * 60 * 1000,
     },
   })
@@ -104,7 +102,7 @@ app.use((req, res, next) => {
 
 (async () => {
   try {
-    log("Starting server initialization...");
+    log("Starting local network host initialization...");
     await registerRoutes(httpServer, app);
 
     app.use(secureErrorHandler);
@@ -118,7 +116,8 @@ app.use((req, res, next) => {
 
     const port = parseInt(process.env.PORT || "5000", 10);
     httpServer.listen(port, "0.0.0.0", () => {
-      log(`Server successfully listening on port ${port}`);
+      log(`SUCCESS: Your Attendance Register is LIVE on your Wi-Fi!`);
+      log(`Have students join your Wi-Fi and open your local IP on port ${port}`);
     });
   } catch (error) {
     console.error("FATAL ERROR DURING STARTUP:", error);

@@ -20,6 +20,7 @@ export type User = typeof users.$inferSelect;
 export const sessions = pgTable("sessions", {
   id: serial("id").primaryKey(),
   name: text("name"),
+  authorizedIp: text("authorized_ip"), // This will store the Host's IP
   startTime: timestamp("start_time").notNull().defaultNow(),
   endTime: timestamp("end_time"),
   isActive: boolean("is_active").notNull().default(true),

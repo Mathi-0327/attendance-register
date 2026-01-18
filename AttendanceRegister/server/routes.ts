@@ -3,44 +3,21 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupWebSocket, getWebSocketServer } from "./websocket";
 import { attendanceFormSchema, studentRegistrationSchema, studentLoginSchema } from "@shared/schema";
-import { validateClientIp, getNetworkConfig } from "./network";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Initialize network configuration
-  getNetworkConfig();
-
   // Setup WebSocket server
   setupWebSocket(httpServer);
 
-  // Helper to get client IP
+  // Helper to get client Public IP (works on Render)
   const getClientIp = (req: Request): string => {
     const forwarded = req.headers["x-forwarded-for"];
     if (typeof forwarded === "string") {
       return forwarded.split(",")[0].trim();
     }
-    const remoteAddr = req.socket.remoteAddress || "";
-    if (remoteAddr.startsWith("::ffff:")) {
-      return remoteAddr.substring(7);
-    }
-    return remoteAddr || "unknown";
-  };
-
-  // IP Validation Middleware
-  const validateIpMiddleware = (req: Request, res: Response, next: NextFunction) => {
-    const clientIp = getClientIp(req);
-    const validation = validateClientIp(clientIp);
-
-    if (!validation.allowed) {
-      return res.status(403).json({
-        error: "Network Access Denied",
-        message: validation.reason || "You must be on the same network as the server.",
-        clientIp,
-      });
-    }
-    next();
+    return req.socket.remoteAddress || "unknown";
   };
 
   // Device Info Helper
@@ -51,16 +28,26 @@ export async function registerRoutes(
 
   // --- API Routes ---
 
-  // Network Check
-  app.get("/api/network/check", (req: Request, res: Response) => {
+  // Network Check (Updated for Host=Student logic)
+  app.get("/api/network/check", async (req: Request, res: Response) => {
     const clientIp = getClientIp(req);
-    const validation = validateClientIp(clientIp);
-    const config = getNetworkConfig();
+    const activeSession = await storage.getActiveSession();
+
+    let allowed = true;
+    let message = "You are ready to submit.";
+
+    if (activeSession && activeSession.authorizedIp) {
+      if (clientIp !== activeSession.authorizedIp) {
+        allowed = false;
+        message = "Access Denied: You are not on the same Wi-Fi network as the Moderator.";
+      }
+    }
+
     res.json({
       clientIp,
-      serverIp: config.serverIp,
-      allowed: validation.allowed,
-      message: validation.allowed ? "You are on the same network" : validation.reason || "Network access denied",
+      authorizedIp: activeSession?.authorizedIp,
+      allowed,
+      message,
     });
   });
 
@@ -70,22 +57,25 @@ export async function registerRoutes(
     res.json({ active: !!session, session });
   });
 
-  // Toggle Session
+  // Toggle Session (Now captures Host IP)
   app.post("/api/session/toggle", async (req: Request, res: Response) => {
     try {
       const activeSession = await storage.getActiveSession();
+      const hostIp = getClientIp(req);
       let updatedSession;
 
       if (activeSession) {
         // Stop session
         updatedSession = await storage.updateSession(activeSession.id, false, new Date());
       } else {
-        // Start new session
+        // Start new session and LOCK it to the Host's current Public IP
         updatedSession = await storage.createSession({
           name: req.body.name || `Session ${new Date().toLocaleDateString()}`,
           isActive: true,
           startTime: new Date(),
+          authorizedIp: hostIp,
         });
+        console.log(`[session] Started and locked to Host IP: ${hostIp}`);
       }
 
       const wsServer = getWebSocketServer();
@@ -107,12 +97,23 @@ export async function registerRoutes(
     }
   });
 
-  // Submit Attendance
-  app.post("/api/attendance", validateIpMiddleware, async (req: Request, res: Response) => {
+  // Submit Attendance (The Core Security Logic)
+  app.post("/api/attendance", async (req: Request, res: Response) => {
     try {
       const activeSession = await storage.getActiveSession();
       if (!activeSession) {
         return res.status(403).json({ error: "No active session" });
+      }
+
+      const clientIp = getClientIp(req);
+
+      // --- THE MAIN SECURITY GOAL ---
+      // Check if Student IP matched the Host IP saved when session started
+      if (activeSession.authorizedIp && clientIp !== activeSession.authorizedIp) {
+        return res.status(403).json({
+          error: "Network Security Violation",
+          message: "You must be on the same Wi-Fi network as the Moderator to submit attendance."
+        });
       }
 
       const validated = attendanceFormSchema.safeParse(req.body);
@@ -121,7 +122,6 @@ export async function registerRoutes(
       }
 
       const { name, studentId, department } = validated.data;
-      const clientIp = getClientIp(req);
       const device = getClientDevice(req);
 
       // Duplicate Check
