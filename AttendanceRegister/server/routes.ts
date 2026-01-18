@@ -51,6 +51,16 @@ export async function registerRoutes(
     });
   });
 
+  // QR Code URL Helper
+  app.get("/api/qr-code", async (req: Request, res: Response) => {
+    const currentUrl = `${req.protocol}://${req.get('host')}`;
+    const attendanceUrl = `${currentUrl}/attendance`;
+    res.json({
+      url: attendanceUrl,
+      qrData: attendanceUrl
+    });
+  });
+
   // Session Status
   app.get("/api/session", async (_req: Request, res: Response) => {
     const session = await storage.getActiveSession();

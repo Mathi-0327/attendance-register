@@ -20,12 +20,12 @@ export function logSecurityEvent(event: Omit<SecurityEvent, "timestamp">) {
     timestamp: new Date(),
   };
   securityEvents.push(fullEvent);
-  
+
   // Keep only recent events
   if (securityEvents.length > MAX_SECURITY_EVENTS) {
     securityEvents.shift();
   }
-  
+
   console.warn(`[security] ${event.type.toUpperCase()}: ${event.method} ${event.path} from ${event.ip}`, event.details || "");
 }
 
@@ -88,14 +88,14 @@ export function rateLimitMiddleware(config?: RateLimitConfig) {
   return (req: Request, res: Response, next: NextFunction) => {
     const clientIp = getClientIp(req);
     const path = req.path;
-    
+
     // Get endpoint-specific config or use default
     const endpointConfig = endpointRateLimits[path] || config || defaultRateLimitConfig;
     const key = `${clientIp}:${path}`;
     const now = Date.now();
-    
+
     let entry = rateLimitStore.get(key);
-    
+
     // Clean up expired entries
     if (entry && entry.resetTime < now) {
       if (entry.blocked && entry.blockUntil && entry.blockUntil > now) {
@@ -107,7 +107,7 @@ export function rateLimitMiddleware(config?: RateLimitConfig) {
           method: req.method,
           details: { reason: "Still blocked", blockUntil: new Date(entry.blockUntil) },
         });
-        
+
         return res.status(429).json({
           error: "Too Many Requests",
           message: `Rate limit exceeded. Please try again after ${Math.ceil((entry.blockUntil - now) / 1000)} seconds.`,
@@ -117,7 +117,7 @@ export function rateLimitMiddleware(config?: RateLimitConfig) {
       // Reset if not blocked or block expired
       entry = undefined;
     }
-    
+
     if (!entry) {
       entry = {
         count: 0,
@@ -125,7 +125,7 @@ export function rateLimitMiddleware(config?: RateLimitConfig) {
         blocked: false,
       };
     }
-    
+
     // Check if currently blocked
     if (entry.blocked && entry.blockUntil && entry.blockUntil > now) {
       logSecurityEvent({
@@ -135,23 +135,23 @@ export function rateLimitMiddleware(config?: RateLimitConfig) {
         method: req.method,
         details: { reason: "Blocked", blockUntil: new Date(entry.blockUntil) },
       });
-      
+
       return res.status(429).json({
         error: "Too Many Requests",
         message: `Rate limit exceeded. Please try again after ${Math.ceil((entry.blockUntil - now) / 1000)} seconds.`,
         retryAfter: Math.ceil((entry.blockUntil - now) / 1000),
       });
     }
-    
+
     entry.count++;
-    
+
     // Check if limit exceeded
     if (entry.count > endpointConfig.maxRequests) {
       entry.blocked = true;
       if (endpointConfig.blockDurationMs) {
         entry.blockUntil = now + endpointConfig.blockDurationMs;
       }
-      
+
       logSecurityEvent({
         type: "rate_limit",
         ip: clientIp,
@@ -163,23 +163,23 @@ export function rateLimitMiddleware(config?: RateLimitConfig) {
           blockDuration: endpointConfig.blockDurationMs,
         },
       });
-      
+
       rateLimitStore.set(key, entry);
-      
+
       return res.status(429).json({
         error: "Too Many Requests",
         message: `Rate limit exceeded. Maximum ${endpointConfig.maxRequests} requests per ${endpointConfig.windowMs / 1000} seconds.`,
         retryAfter: endpointConfig.blockDurationMs ? Math.ceil(endpointConfig.blockDurationMs / 1000) : undefined,
       });
     }
-    
+
     rateLimitStore.set(key, entry);
-    
+
     // Add rate limit headers
     res.setHeader("X-RateLimit-Limit", endpointConfig.maxRequests.toString());
     res.setHeader("X-RateLimit-Remaining", Math.max(0, endpointConfig.maxRequests - entry.count).toString());
     res.setHeader("X-RateLimit-Reset", new Date(entry.resetTime).toISOString());
-    
+
     next();
   };
 }
@@ -188,27 +188,27 @@ export function rateLimitMiddleware(config?: RateLimitConfig) {
 export function securityHeadersMiddleware(req: Request, res: Response, next: NextFunction) {
   // Prevent clickjacking
   res.setHeader("X-Frame-Options", "DENY");
-  
+
   // Prevent MIME type sniffing
   res.setHeader("X-Content-Type-Options", "nosniff");
-  
+
   // Enable XSS protection
   res.setHeader("X-XSS-Protection", "1; mode=block");
-  
+
   // Referrer policy
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  
+
   // Content Security Policy (relaxed for development)
   if (process.env.NODE_ENV === "production") {
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ws: wss:;"
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://api.qrserver.com; font-src 'self' data:; connect-src 'self' ws: wss:;"
     );
   }
-  
+
   // Remove server header
   res.removeHeader("X-Powered-By");
-  
+
   next();
 }
 
@@ -218,7 +218,7 @@ const MAX_URL_LENGTH = 2048;
 
 export function requestSizeMiddleware(req: Request, res: Response, next: NextFunction) {
   const urlLength = req.url.length;
-  
+
   if (urlLength > MAX_URL_LENGTH) {
     logSecurityEvent({
       type: "suspicious_request",
@@ -227,13 +227,13 @@ export function requestSizeMiddleware(req: Request, res: Response, next: NextFun
       method: req.method,
       details: { reason: "URL too long", length: urlLength },
     });
-    
+
     return res.status(414).json({
       error: "Request URI Too Long",
       message: `URL exceeds maximum length of ${MAX_URL_LENGTH} characters`,
     });
   }
-  
+
   const contentLength = req.headers["content-length"];
   if (contentLength) {
     const size = parseInt(contentLength, 10);
@@ -245,14 +245,14 @@ export function requestSizeMiddleware(req: Request, res: Response, next: NextFun
         method: req.method,
         details: { size, maxSize: MAX_REQUEST_SIZE },
       });
-      
+
       return res.status(413).json({
         error: "Payload Too Large",
         message: `Request body exceeds maximum size of ${MAX_REQUEST_SIZE} bytes`,
       });
     }
   }
-  
+
   next();
 }
 
@@ -261,24 +261,24 @@ export function sanitizeString(input: string): string {
   if (typeof input !== "string") {
     return "";
   }
-  
+
   // Remove null bytes
   let sanitized = input.replace(/\0/g, "");
-  
+
   // Trim whitespace
   sanitized = sanitized.trim();
-  
+
   // Limit length (prevent extremely long strings)
   if (sanitized.length > 500) {
     sanitized = sanitized.substring(0, 500);
   }
-  
+
   return sanitized;
 }
 
 export function sanitizeObject(obj: Record<string, any>): Record<string, any> {
   const sanitized: Record<string, any> = {};
-  
+
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === "string") {
       sanitized[key] = sanitizeString(value);
@@ -292,7 +292,7 @@ export function sanitizeObject(obj: Record<string, any>): Record<string, any> {
       sanitized[key] = value;
     }
   }
-  
+
   return sanitized;
 }
 
@@ -310,7 +310,7 @@ export function getClientIp(req: Request): string {
 }
 
 // Admin authentication with secure password hashing
-const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || 
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH ||
   createHash("sha256").update("admin123").digest("hex"); // Default hash for "admin123"
 
 const adminSessions = new Map<string, { expiresAt: number; ip: string }>();
@@ -335,7 +335,7 @@ export function createAdminSession(ip: string): string {
     expiresAt: Date.now() + SESSION_DURATION,
     ip,
   });
-  
+
   // Clean up expired sessions periodically
   if (adminSessions.size > 100) {
     const now = Date.now();
@@ -346,7 +346,7 @@ export function createAdminSession(ip: string): string {
       }
     }
   }
-  
+
   return sessionId;
 }
 
@@ -355,28 +355,28 @@ export function verifyAdminSession(sessionId: string, ip: string): boolean {
   if (!session) {
     return false;
   }
-  
+
   if (session.expiresAt < Date.now()) {
     adminSessions.delete(sessionId);
     return false;
   }
-  
+
   // Optional: verify IP matches (can be relaxed for NAT/proxy scenarios)
   // if (session.ip !== ip) {
   //   return false;
   // }
-  
+
   return true;
 }
 
 export function checkLoginAttempts(ip: string): { allowed: boolean; remainingAttempts: number } {
   const now = Date.now();
   let attempt = loginAttempts.get(ip);
-  
+
   if (!attempt || attempt.resetTime < now) {
     attempt = { count: 0, resetTime: now + LOGIN_ATTEMPT_WINDOW };
   }
-  
+
   if (attempt.count >= MAX_LOGIN_ATTEMPTS) {
     logSecurityEvent({
       type: "auth_failure",
@@ -385,13 +385,13 @@ export function checkLoginAttempts(ip: string): { allowed: boolean; remainingAtt
       method: "POST",
       details: { reason: "Too many login attempts" },
     });
-    
+
     return {
       allowed: false,
       remainingAttempts: 0,
     };
   }
-  
+
   return {
     allowed: true,
     remainingAttempts: MAX_LOGIN_ATTEMPTS - attempt.count,
@@ -401,11 +401,11 @@ export function checkLoginAttempts(ip: string): { allowed: boolean; remainingAtt
 export function recordLoginAttempt(ip: string, success: boolean) {
   const now = Date.now();
   let attempt = loginAttempts.get(ip);
-  
+
   if (!attempt || attempt.resetTime < now) {
     attempt = { count: 0, resetTime: now + LOGIN_ATTEMPT_WINDOW };
   }
-  
+
   if (success) {
     // Reset on successful login
     loginAttempts.delete(ip);
@@ -419,7 +419,7 @@ export function recordLoginAttempt(ip: string, success: boolean) {
 export function requireAdminAuth(req: Request, res: Response, next: NextFunction) {
   const sessionId = req.headers["x-admin-session"] as string | undefined;
   const clientIp = getClientIp(req);
-  
+
   if (!sessionId || !verifyAdminSession(sessionId, clientIp)) {
     logSecurityEvent({
       type: "auth_failure",
@@ -428,13 +428,13 @@ export function requireAdminAuth(req: Request, res: Response, next: NextFunction
       method: req.method,
       details: { reason: "Invalid or missing session" },
     });
-    
+
     return res.status(401).json({
       error: "Unauthorized",
       message: "Admin authentication required",
     });
   }
-  
+
   next();
 }
 
@@ -450,18 +450,18 @@ export function timeoutMiddleware(timeoutMs: number = 30000) {
           method: req.method,
           details: { reason: "Request timeout" },
         });
-        
+
         res.status(408).json({
           error: "Request Timeout",
           message: "Request took too long to process",
         });
       }
     }, timeoutMs);
-    
+
     res.on("finish", () => {
       clearTimeout(timer);
     });
-    
+
     next();
   };
 }
@@ -469,15 +469,15 @@ export function timeoutMiddleware(timeoutMs: number = 30000) {
 // CORS configuration
 export function corsMiddleware(req: Request, res: Response, next: NextFunction) {
   const origin = req.headers.origin;
-  const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim())
     : []; // Empty means same-origin only
-  
+
   // In development, allow localhost
   if (process.env.NODE_ENV === "development") {
     allowedOrigins.push("http://localhost:5000", "http://127.0.0.1:5000");
   }
-  
+
   // Allow same-origin requests
   if (!origin || allowedOrigins.includes(origin) || origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) {
     if (origin) {
@@ -488,12 +488,12 @@ export function corsMiddleware(req: Request, res: Response, next: NextFunction) 
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-admin-session, x-device-id");
     res.setHeader("Access-Control-Max-Age", "86400"); // 24 hours
   }
-  
+
   // Handle preflight requests
   if (req.method === "OPTIONS") {
     return res.status(204).end();
   }
-  
+
   next();
 }
 
@@ -534,7 +534,7 @@ export function isBlacklisted(ip: string): boolean {
 
 export function ipFilterMiddleware(req: Request, res: Response, next: NextFunction) {
   const clientIp = getClientIp(req);
-  
+
   // Check blacklist first
   if (isBlacklisted(clientIp)) {
     logSecurityEvent({
@@ -544,13 +544,13 @@ export function ipFilterMiddleware(req: Request, res: Response, next: NextFuncti
       method: req.method,
       details: { reason: "Blacklisted IP" },
     });
-    
+
     return res.status(403).json({
       error: "Access Denied",
       message: "Your IP address has been blocked",
     });
   }
-  
+
   // If whitelist exists and is not empty, enforce it
   if (ipWhitelist.size > 0 && !ipWhitelist.has(clientIp) && clientIp !== "127.0.0.1" && !clientIp.startsWith("::ffff:127.0.0.1")) {
     logSecurityEvent({
@@ -560,13 +560,13 @@ export function ipFilterMiddleware(req: Request, res: Response, next: NextFuncti
       method: req.method,
       details: { reason: "IP not in whitelist" },
     });
-    
+
     return res.status(403).json({
       error: "Access Denied",
       message: "Your IP address is not authorized",
     });
   }
-  
+
   next();
 }
 
@@ -576,7 +576,7 @@ export function generateDeviceFingerprint(req: Request): string {
   const userAgent = req.headers["user-agent"] || "";
   const acceptLanguage = req.headers["accept-language"] || "";
   const acceptEncoding = req.headers["accept-encoding"] || "";
-  
+
   const fingerprintData = `${ip}:${userAgent}:${acceptLanguage}:${acceptEncoding}`;
   return createHash("sha256").update(fingerprintData).digest("hex").substring(0, 16);
 }
@@ -596,12 +596,12 @@ export function detectAnomalies(req: Request): { suspicious: boolean; reason?: s
   const clientIp = getClientIp(req);
   const now = Date.now();
   const fiveMinutesAgo = now - 5 * 60 * 1000;
-  
+
   // Clean old requests
   while (recentRequests.length > 0 && recentRequests[0].timestamp < fiveMinutesAgo) {
     recentRequests.shift();
   }
-  
+
   // Add current request
   recentRequests.push({
     ip: clientIp,
@@ -609,38 +609,38 @@ export function detectAnomalies(req: Request): { suspicious: boolean; reason?: s
     method: req.method,
     timestamp: now,
   });
-  
+
   // Keep only recent requests
   if (recentRequests.length > MAX_RECENT_REQUESTS) {
     recentRequests.shift();
   }
-  
+
   // Check for rapid requests from same IP
   const recentFromIp = recentRequests.filter(r => r.ip === clientIp && r.timestamp > fiveMinutesAgo);
   if (recentFromIp.length > 100) {
     return { suspicious: true, reason: "Too many requests in short time" };
   }
-  
+
   // Check for repeated failed requests
-  const failedRequests = recentFromIp.filter(r => 
+  const failedRequests = recentFromIp.filter(r =>
     r.path.includes("/admin/login") || r.path.includes("/api/attendance")
   );
   if (failedRequests.length > 20) {
     return { suspicious: true, reason: "Repeated failed authentication attempts" };
   }
-  
+
   // Check for scanning behavior (many different paths)
   const uniquePaths = new Set(recentFromIp.map(r => r.path));
   if (uniquePaths.size > 50) {
     return { suspicious: true, reason: "Scanning behavior detected" };
   }
-  
+
   return { suspicious: false };
 }
 
 export function anomalyDetectionMiddleware(req: Request, res: Response, next: NextFunction) {
   const anomaly = detectAnomalies(req);
-  
+
   if (anomaly.suspicious) {
     logSecurityEvent({
       type: "suspicious_request",
@@ -649,39 +649,39 @@ export function anomalyDetectionMiddleware(req: Request, res: Response, next: Ne
       method: req.method,
       details: { reason: anomaly.reason },
     });
-    
+
     // Don't block, just log - rate limiting will handle it
   }
-  
+
   next();
 }
 
 // Password complexity validation
 export function validatePasswordComplexity(password: string): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  
+
   if (password.length < 8) {
     errors.push("Password must be at least 8 characters long");
   }
-  
+
   if (!/[A-Z]/.test(password)) {
     errors.push("Password must contain at least one uppercase letter");
   }
-  
+
   if (!/[a-z]/.test(password)) {
     errors.push("Password must contain at least one lowercase letter");
   }
-  
+
   if (!/[0-9]/.test(password)) {
     errors.push("Password must contain at least one number");
   }
-  
+
   // Check for common passwords (basic check)
   const commonPasswords = ["password", "admin", "12345678", "qwerty", "letmein"];
   if (commonPasswords.some(common => password.toLowerCase().includes(common))) {
     errors.push("Password is too common");
   }
-  
+
   return {
     valid: errors.length === 0,
     errors,
@@ -694,26 +694,26 @@ export function rotateAdminSession(oldSessionId: string, ip: string): string | n
   if (!session || session.expiresAt < Date.now()) {
     return null;
   }
-  
+
   // Create new session
   const newSessionId = createAdminSession(ip);
-  
+
   // Transfer expiry time
   const newSession = adminSessions.get(newSessionId);
   if (newSession) {
     newSession.expiresAt = session.expiresAt;
   }
-  
+
   // Remove old session
   adminSessions.delete(oldSessionId);
-  
+
   return newSessionId;
 }
 
 // Enhanced error handling - don't leak sensitive information
 export function secureErrorHandler(err: any, req: Request, res: Response, next: NextFunction) {
   const isDevelopment = process.env.NODE_ENV === "development";
-  
+
   // Log full error for debugging
   console.error("[error]", {
     message: err.message,
@@ -723,15 +723,15 @@ export function secureErrorHandler(err: any, req: Request, res: Response, next: 
     ip: getClientIp(req),
     requestId: (req as any).requestId,
   });
-  
+
   // Don't expose stack traces or internal errors in production
   const status = err.status || err.statusCode || 500;
-  const message = isDevelopment 
-    ? err.message 
-    : status === 500 
-      ? "Internal Server Error" 
+  const message = isDevelopment
+    ? err.message
+    : status === 500
+      ? "Internal Server Error"
       : err.message;
-  
+
   res.status(status).json({
     error: message,
     requestId: (req as any).requestId,
@@ -744,7 +744,7 @@ export function requestValidationMiddleware(req: Request, res: Response, next: N
   // Check for SQL injection patterns in query params
   const sqlPatterns = [/(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE)\b)/i];
   const url = req.url.toLowerCase();
-  
+
   for (const pattern of sqlPatterns) {
     if (pattern.test(url)) {
       logSecurityEvent({
@@ -754,14 +754,14 @@ export function requestValidationMiddleware(req: Request, res: Response, next: N
         method: req.method,
         details: { reason: "Potential SQL injection attempt" },
       });
-      
+
       return res.status(400).json({
         error: "Invalid Request",
         message: "Request contains invalid characters",
       });
     }
   }
-  
+
   // Check for path traversal attempts
   if (url.includes("..") || url.includes("//") || url.includes("\\")) {
     logSecurityEvent({
@@ -771,13 +771,13 @@ export function requestValidationMiddleware(req: Request, res: Response, next: N
       method: req.method,
       details: { reason: "Potential path traversal attempt" },
     });
-    
+
     return res.status(400).json({
       error: "Invalid Request",
       message: "Invalid path",
     });
   }
-  
+
   next();
 }
 
