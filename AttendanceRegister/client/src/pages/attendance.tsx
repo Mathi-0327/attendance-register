@@ -103,17 +103,16 @@ export default function Attendance() {
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-background flex flex-col">
       <Header />
-      
+
       <main className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          
+
           {/* Network Status Indicator */}
           {networkStatus && (
-            <div className={`flex items-center justify-center gap-2 mb-8 text-sm rounded-full py-2 px-4 w-fit mx-auto border shadow-sm ${
-              networkStatus.allowed 
-                ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300" 
+            <div className={`flex items-center justify-center gap-2 mb-8 text-sm rounded-full py-2 px-4 w-fit mx-auto border shadow-sm ${networkStatus.allowed
+                ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300"
                 : "bg-destructive/10 border-destructive/20 text-destructive"
-            }`}>
+              }`}>
               {networkStatus.allowed ? (
                 <>
                   <Wifi className="w-4 h-4" />
@@ -163,24 +162,24 @@ export default function Attendance() {
                 </Card>
               </motion.div>
             ) : !sessionActive ? (
-               <motion.div
-               key="inactive"
-               initial={{ opacity: 0, scale: 0.95 }}
-               animate={{ opacity: 1, scale: 1 }}
-               exit={{ opacity: 0, scale: 0.95 }}
-             >
-               <Card className="border-destructive/20 shadow-lg">
-                 <CardHeader className="text-center pb-2">
-                   <div className="mx-auto bg-destructive/10 w-12 h-12 rounded-full flex items-center justify-center mb-4">
-                     <AlertCircle className="w-6 h-6 text-destructive" />
-                   </div>
-                   <CardTitle className="text-destructive">Session Inactive</CardTitle>
-                 </CardHeader>
-                 <CardContent className="text-center text-muted-foreground">
-                   Attendance is currently closed by the host. Please wait for the session to start.
-                 </CardContent>
-               </Card>
-             </motion.div>
+              <motion.div
+                key="inactive"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+              >
+                <Card className="border-destructive/20 shadow-lg">
+                  <CardHeader className="text-center pb-2">
+                    <div className="mx-auto bg-destructive/10 w-12 h-12 rounded-full flex items-center justify-center mb-4">
+                      <AlertCircle className="w-6 h-6 text-destructive" />
+                    </div>
+                    <CardTitle className="text-destructive">Session Inactive</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-center text-muted-foreground">
+                    Attendance is currently closed by the host. Please wait for the session to start.
+                  </CardContent>
+                </Card>
+              </motion.div>
             ) : submitted ? (
               <motion.div
                 key="success"
@@ -191,7 +190,7 @@ export default function Attendance() {
                 <Card className="border-emerald-500/20 shadow-lg overflow-hidden relative">
                   <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500" />
                   <CardHeader className="text-center pb-2">
-                    <motion.div 
+                    <motion.div
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ type: "spring", stiffness: 200, damping: 10 }}
@@ -218,11 +217,6 @@ export default function Attendance() {
                       </div>
                     </div>
                   </CardContent>
-                  <CardFooter>
-                    <Button variant="outline" className="w-full" onClick={() => setSubmitted(false)}>
-                      Submit Another
-                    </Button>
-                  </CardFooter>
                 </Card>
               </motion.div>
             ) : (
@@ -236,7 +230,7 @@ export default function Attendance() {
                   <CardHeader>
                     <CardTitle className="text-2xl">Mark Attendance</CardTitle>
                     <CardDescription>
-                      {student 
+                      {student
                         ? `Logged in as ${student.name} (${student.studentId})`
                         : "Enter your details to clock in for today's session."
                       }
@@ -278,10 +272,10 @@ export default function Attendance() {
                             <FormItem>
                               <FormLabel>Full Name</FormLabel>
                               <FormControl>
-                                <Input 
-                                  placeholder="John Doe" 
-                                  {...field} 
-                                  className="h-11" 
+                                <Input
+                                  placeholder="John Doe"
+                                  {...field}
+                                  className="h-11"
                                   disabled={!!student}
                                 />
                               </FormControl>
@@ -296,10 +290,10 @@ export default function Attendance() {
                             <FormItem>
                               <FormLabel>Student / Employee ID</FormLabel>
                               <FormControl>
-                                <Input 
-                                  placeholder="ID-12345" 
-                                  {...field} 
-                                  className="h-11 font-mono" 
+                                <Input
+                                  placeholder="ID-12345"
+                                  {...field}
+                                  className="h-11 font-mono"
                                   disabled={!!student}
                                 />
                               </FormControl>
@@ -336,8 +330,8 @@ export default function Attendance() {
                             {error}
                           </div>
                         )}
-                        <Button 
-                          type="submit" 
+                        <Button
+                          type="submit"
                           className="w-full h-12 text-lg font-medium bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
                           disabled={isSubmitting}
                         >
