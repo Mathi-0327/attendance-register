@@ -36,7 +36,7 @@ interface SystemContextType {
   logout: () => void;
   toggleSession: (name?: string, lateThreshold?: number) => Promise<void>;
   markAttendance: (data: Omit<AttendanceRecord, 'id' | 'timestamp' | 'ipAddress' | 'device' | 'status'>) => Promise<void>;
-  exportData: (format: 'pdf' | 'excel') => Promise<void>;
+  exportData: (format: 'excel') => Promise<void>;
   resetSession: () => Promise<void>;
   // New features
   searchRecords: (query: string, filters?: any, sort?: any) => Promise<AttendanceRecord[]>;
@@ -387,7 +387,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     };
   };
 
-  const exportData = async (format: 'pdf' | 'excel') => {
+  const exportData = async (format: 'excel') => {
     if (format === 'excel') {
       const headers = ['Name', 'ID', 'Department', 'Time', 'Device', 'IP', 'Status'];
       const rows = records.map(r => [
@@ -414,39 +414,6 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } else if (format === 'pdf') {
-      try {
-        const jsPDF = (await import('jspdf')).default;
-        const autoTable = (await import('jspdf-autotable')).default;
-
-        const doc = new jsPDF();
-        doc.setFontSize(18);
-        doc.text("Attendance Report", 14, 22);
-
-        doc.setFontSize(11);
-        doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 30);
-        doc.text(`Total Records: ${records.length}`, 14, 37);
-
-        const tableColumn = ["Name", "ID", "Department", "Time", "Status"];
-        const tableRows = records.map(r => [
-          r.name,
-          r.studentId,
-          r.department || 'N/A',
-          new Date(r.timestamp).toLocaleTimeString(),
-          r.status
-        ]);
-
-        autoTable(doc, {
-          head: [tableColumn],
-          body: tableRows,
-          startY: 45,
-        });
-
-        doc.save(`attendance_report_${new Date().toISOString().split('T')[0]}.pdf`);
-      } catch (error) {
-        console.error('PDF Export Error:', error);
-        throw error;
-      }
     }
   };
 

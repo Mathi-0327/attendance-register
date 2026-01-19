@@ -98,7 +98,7 @@ export default function AdminDashboard() {
     return nameMatch || dateMatch;
   });
 
-  const exportSessionHistory = async (type: 'excel' | 'pdf') => {
+  const exportSessionHistory = async (type: 'excel') => {
     try {
       const dataToExport = filteredSessions.length > 0 ? filteredSessions : sessions;
 
@@ -116,36 +116,6 @@ export default function AdminDashboard() {
         XLSX.utils.book_append_sheet(workbook, worksheet, "Session History");
         XLSX.writeFile(workbook, `Session_History_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
         toast.success("Current session history view exported to Excel");
-      } else if (type === 'pdf') {
-        const jsPDF = (await import('jspdf')).default;
-        const autoTable = (await import('jspdf-autotable')).default;
-
-        const doc = new jsPDF();
-
-        // Add title
-        doc.setFontSize(18);
-        doc.text("Session History Report", 14, 22);
-
-        doc.setFontSize(11);
-        doc.text(`Generated on: ${format(new Date(), "MMM dd, yyyy HH:mm:ss")}`, 14, 30);
-
-        const tableColumn = ["Session Name", "Date", "Start Time", "End Time", "Status"];
-        const tableRows = dataToExport.map(s => [
-          s.name || "Untitled Session",
-          format(new Date(s.startTime), "MMM dd, yyyy"),
-          format(new Date(s.startTime), "HH:mm:ss"),
-          s.endTime ? format(new Date(s.endTime), "HH:mm:ss") : "Active",
-          s.isActive ? "Active" : "Closed"
-        ]);
-
-        autoTable(doc, {
-          head: [tableColumn],
-          body: tableRows,
-          startY: 40,
-        });
-
-        doc.save(`Session_History_${format(new Date(), "yyyy-MM-dd")}.pdf`);
-        toast.success("Current session history view exported to PDF");
       }
     } catch (error) {
       console.error("Export error:", error);
@@ -153,7 +123,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const exportSpecificSession = async (session: any, type: 'excel' | 'pdf') => {
+  const exportSpecificSession = async (session: any, type: 'excel') => {
     if (!session || !session.records || session.records.length === 0) {
       toast.error("No records to export for this session");
       return;
@@ -175,35 +145,6 @@ export default function AdminDashboard() {
         XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
         XLSX.writeFile(workbook, `Attendance_${session.name || 'Session'}_${format(new Date(session.startTime), "yyyy-MM-dd")}.xlsx`);
         toast.success("Session attendance exported to Excel");
-      } else if (type === 'pdf') {
-        const jsPDF = (await import('jspdf')).default;
-        const autoTable = (await import('jspdf-autotable')).default;
-
-        const doc = new jsPDF();
-        doc.setFontSize(18);
-        doc.text(`Attendance: ${session.name || 'Untitled Session'}`, 14, 22);
-
-        doc.setFontSize(11);
-        doc.text(`Date: ${format(new Date(session.startTime), "MMMM dd, yyyy")}`, 14, 30);
-        doc.text(`Total Present: ${session.records.length}`, 14, 37);
-
-        const tableColumn = ["Name", "ID", "Department", "Time", "Status"];
-        const tableRows = session.records.map((r: any) => [
-          r.name,
-          r.studentId,
-          r.department || 'N/A',
-          format(new Date(r.timestamp), "HH:mm:ss"),
-          r.status
-        ]);
-
-        autoTable(doc, {
-          head: [tableColumn],
-          body: tableRows,
-          startY: 45,
-        });
-
-        doc.save(`Attendance_${session.name || 'Session'}_${format(new Date(session.startTime), "yyyy-MM-dd")}.pdf`);
-        toast.success("Session attendance exported to PDF");
       }
     } catch (error) {
       console.error("Export error:", error);
@@ -385,11 +326,11 @@ export default function AdminDashboard() {
     );
   }
 
-  const handleExport = async (type: 'pdf' | 'excel') => {
+  const handleExport = async (type: 'excel') => {
     const promise = exportData(type);
     toast.promise(promise, {
-      loading: `Generating ${type.toUpperCase()} report...`,
-      success: `${type.toUpperCase()} exported successfully`,
+      loading: `Generating EXCEL report...`,
+      success: `EXCEL exported successfully`,
       error: 'Export failed',
     });
   };
@@ -661,10 +602,6 @@ export default function AdminDashboard() {
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
                   Excel
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => exportSessionHistory('pdf')}>
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  PDF
-                </Button>
                 <Button variant="outline" size="sm" onClick={loadSessions} disabled={loadingSessions}>
                   <RefreshCw className={`h-4 w-4 mr-2 ${loadingSessions ? 'animate-spin' : ''}`} />
                   Refresh
@@ -744,15 +681,6 @@ export default function AdminDashboard() {
                         >
                           <FileSpreadsheet className="h-4 w-4 mr-2" />
                           Excel
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => exportSpecificSession(selectedSessionForDetails, 'pdf')}
-                          disabled={!selectedSessionForDetails?.records?.length}
-                        >
-                          <FileSpreadsheet className="h-4 w-4 mr-2" />
-                          PDF
                         </Button>
                       </div>
                     </div>
@@ -904,17 +832,6 @@ export default function AdminDashboard() {
                     <div className="flex flex-col items-start text-sm">
                       <span className="font-medium">Export Excel</span>
                       <span className="text-xs text-muted-foreground">Formatted .xlsx report</span>
-                    </div>
-                  </Button>
-                  <Button
-                    className="w-full justify-start gap-3 h-12"
-                    onClick={() => handleExport('pdf')}
-                    variant="outline"
-                  >
-                    <FileSpreadsheet className="h-5 w-5 text-red-600" />
-                    <div className="flex flex-col items-start text-sm">
-                      <span className="font-medium">Export PDF</span>
-                      <span className="text-xs text-muted-foreground">Printable document</span>
                     </div>
                   </Button>
 
