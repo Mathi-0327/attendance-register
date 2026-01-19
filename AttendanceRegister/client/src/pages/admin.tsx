@@ -17,7 +17,6 @@ import {
   Users,
   Clock,
   FileSpreadsheet,
-  Presentation,
   Trash2,
   RefreshCw,
   UserCheck,
@@ -218,6 +217,13 @@ export default function AdminDashboard() {
     }
   }, [isAuthenticated, activeView]);
 
+  // Automatically switch to Attendance view when session starts
+  useEffect(() => {
+    if (sessionActive) {
+      setActiveView("attendance");
+    }
+  }, [sessionActive]);
+
   // Update filtered records when records or activeSession change
   useEffect(() => {
     setFilteredRecords(dashboardRecords);
@@ -379,11 +385,11 @@ export default function AdminDashboard() {
     );
   }
 
-  const handleExport = async (type: 'slides' | 'csv' | 'pdf' | 'excel') => {
+  const handleExport = async (type: 'pdf' | 'excel') => {
     const promise = exportData(type);
     toast.promise(promise, {
-      loading: `Generating ${type === 'slides' ? 'Google Slides' : type.toUpperCase()} report...`,
-      success: `${type === 'slides' ? 'Google Slides' : type.toUpperCase()} exported successfully`,
+      loading: `Generating ${type.toUpperCase()} report...`,
+      success: `${type.toUpperCase()} exported successfully`,
       error: 'Export failed',
     });
   };
@@ -889,28 +895,6 @@ export default function AdminDashboard() {
                   <CardDescription>Export data or manage session.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button
-                    className="w-full justify-start gap-3 h-12"
-                    onClick={() => handleExport('slides')}
-                    variant="outline"
-                  >
-                    <Presentation className="h-5 w-5 text-orange-500" />
-                    <div className="flex flex-col items-start text-sm">
-                      <span className="font-medium">Export to Google Slides</span>
-                      <span className="text-xs text-muted-foreground">Generate presentation report</span>
-                    </div>
-                  </Button>
-                  <Button
-                    className="w-full justify-start gap-3 h-12"
-                    onClick={() => handleExport('csv')}
-                    variant="outline"
-                  >
-                    <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
-                    <div className="flex flex-col items-start text-sm">
-                      <span className="font-medium">Export CSV</span>
-                      <span className="text-xs text-muted-foreground">Download raw data</span>
-                    </div>
-                  </Button>
                   <Button
                     className="w-full justify-start gap-3 h-12"
                     onClick={() => handleExport('excel')}
