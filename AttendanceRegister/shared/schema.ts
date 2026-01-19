@@ -104,5 +104,6 @@ export const attendanceFormSchema = z.object({
   name: z.string().min(2, "Name is required"),
   studentId: z.string().min(3, "ID is required"),
   department: z.string().optional(),
+  deviceId: z.string().optional(),
 });
 

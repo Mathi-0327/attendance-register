@@ -131,14 +131,32 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Validation failed", details: validated.error.errors });
       }
 
-      const { name, studentId, department } = validated.data;
-      const device = getClientDevice(req);
+      const { name, studentId, department, deviceId } = validated.data;
 
-      // Duplicate Check
+      // Registration Check: Verify student exists in the system
+      const student = await storage.getStudentById(studentId);
+      if (!student) {
+        return res.status(401).json({
+          error: "Not Registered",
+          message: "Your Student ID is not registered. Please register first before submitting attendance."
+        });
+      }
+
+      const deviceFingerprint = deviceId || getClientDevice(req);
+
+      // Duplicate Check: Look for same Student ID OR same Device Fingerprint in this session
       const records = await storage.getAllAttendanceRecords();
-      const duplicate = records.find(r => r.studentId === studentId && r.sessionId === activeSession.id);
-      if (duplicate) {
-        return res.status(409).json({ error: "Attendance already submitted for this session" });
+      const duplicateRecord = records.find(r =>
+        r.sessionId === activeSession.id &&
+        (r.studentId === studentId || r.device === deviceFingerprint)
+      );
+
+      if (duplicateRecord) {
+        if (duplicateRecord.studentId === studentId) {
+          return res.status(409).json({ error: "Attendance already submitted for this student ID in this session" });
+        } else {
+          return res.status(409).json({ error: "One device per attendance allowed", message: "This device has already been used to submit attendance for this session." });
+        }
       }
 
       const record = await storage.createAttendanceRecord({
@@ -147,7 +165,7 @@ export async function registerRoutes(
         studentId,
         department,
         ipAddress: clientIp,
-        device,
+        device: deviceFingerprint,
         status: "present",
       });
 
