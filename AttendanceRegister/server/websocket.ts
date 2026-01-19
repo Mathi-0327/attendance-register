@@ -99,10 +99,13 @@ class WSServer {
     });
   }
 
-  notifySessionToggled(active: boolean) {
+  notifySessionToggled(session: any) {
     this.broadcast({
       type: "session_toggled",
-      data: { active },
+      data: {
+        active: session.isActive,
+        session: session
+      },
     });
   }
 

@@ -3,6 +3,7 @@ import { createContext, useContext, useState, ReactNode, useEffect, useRef } fro
 // Types
 export interface AttendanceRecord {
   id: string;
+  sessionId: number;
   name: string;
   studentId: string;
   department?: string;
@@ -12,6 +13,15 @@ export interface AttendanceRecord {
   status: 'present' | 'late';
 }
 
+export interface Session {
+  id: number;
+  name: string | null;
+  authorizedIp: string | null;
+  startTime: string | Date;
+  endTime: string | Date | null;
+  isActive: boolean;
+}
+
 interface WebSocketMessage {
   type: "attendance_recorded" | "session_toggled" | "records_cleared" | "initial_data";
   data?: any;
@@ -19,13 +29,14 @@ interface WebSocketMessage {
 
 interface SystemContextType {
   sessionActive: boolean;
+  activeSession: Session | null;
   records: AttendanceRecord[];
   isAuthenticated: boolean;
   login: (password: string) => { success: boolean; error?: string; remainingAttempts?: number };
   logout: () => void;
   toggleSession: (name?: string, lateThreshold?: number) => Promise<void>;
   markAttendance: (data: Omit<AttendanceRecord, 'id' | 'timestamp' | 'ipAddress' | 'device' | 'status'>) => Promise<void>;
-  exportData: (format: 'slides' | 'csv' | 'pdf') => Promise<void>;
+  exportData: (format: 'slides' | 'csv' | 'pdf' | 'excel') => Promise<void>;
   resetSession: () => Promise<void>;
   // New features
   searchRecords: (query: string, filters?: any, sort?: any) => Promise<AttendanceRecord[]>;
@@ -66,6 +77,7 @@ function getOrCreateDeviceId(): string {
 
 export function SystemProvider({ children }: { children: ReactNode }) {
   const [sessionActive, setSessionActive] = useState(false);
+  const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem(AUTH_KEY) === 'true';
@@ -173,8 +185,9 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         const contentType = sessionRes.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
           try {
-            const { active } = await sessionRes.json();
+            const { active, session } = await sessionRes.json();
             setSessionActive(active);
+            setActiveSession(session);
           } catch (parseError) {
             console.error('[api] Error parsing session response:', parseError);
           }
@@ -212,6 +225,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         if (message.data && message.data.active !== undefined) {
           console.log(`[websocket] Session toggled to: ${message.data.active ? 'Active' : 'Inactive'}`);
           setSessionActive(message.data.active);
+          setActiveSession(message.data.session || null);
         }
         break;
       case 'records_cleared':
@@ -255,9 +269,10 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       }
 
       const responseData = await res.json();
-      const { active } = responseData;
+      const { active, session } = responseData;
       // WebSocket will also update, but we set it here immediately
       setSessionActive(active);
+      setActiveSession(session);
     } catch (error: any) {
       console.error('[api] Error toggling session:', error);
       // Re-throw with a user-friendly message
@@ -372,9 +387,9 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     };
   };
 
-  const exportData = async (format: 'slides' | 'csv' | 'pdf') => {
+  const exportData = async (format: 'slides' | 'csv' | 'pdf' | 'excel') => {
     // Real CSV Export Implementation
-    if (format === 'csv') {
+    if (format === 'csv' || format === 'excel') {
       const headers = ['Name', 'ID', 'Department', 'Time', 'Device', 'IP', 'Status'];
       const rows = records.map(r => [
         r.name,
@@ -430,6 +445,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
   return (
     <SystemContext.Provider value={{
       sessionActive,
+      activeSession,
       records,
       isAuthenticated,
       login,

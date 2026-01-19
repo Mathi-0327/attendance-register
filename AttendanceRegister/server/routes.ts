@@ -89,7 +89,7 @@ export async function registerRoutes(
       }
 
       const wsServer = getWebSocketServer();
-      if (wsServer) wsServer.notifySessionToggled(updatedSession.isActive);
+      if (wsServer) wsServer.notifySessionToggled(updatedSession);
 
       res.json({ active: updatedSession.isActive, session: updatedSession });
     } catch (error) {

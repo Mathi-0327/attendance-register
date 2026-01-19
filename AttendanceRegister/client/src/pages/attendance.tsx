@@ -10,10 +10,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Wifi, Lock, AlertCircle, WifiOff, UserCheck, UserPlus } from "lucide-react";
+import { CheckCircle2, Wifi, Lock, AlertCircle, WifiOff } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -110,8 +109,8 @@ export default function Attendance() {
           {/* Network Status Indicator */}
           {networkStatus && (
             <div className={`flex items-center justify-center gap-2 mb-8 text-sm rounded-full py-2 px-4 w-fit mx-auto border shadow-sm ${networkStatus.allowed
-                ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300"
-                : "bg-destructive/10 border-destructive/20 text-destructive"
+              ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300"
+              : "bg-destructive/10 border-destructive/20 text-destructive"
               }`}>
               {networkStatus.allowed ? (
                 <>
@@ -237,32 +236,6 @@ export default function Attendance() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {!student && (
-                      <Alert className="mb-6 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-                        <UserPlus className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        <AlertTitle className="text-blue-900 dark:text-blue-100">Register for Better Experience</AlertTitle>
-                        <AlertDescription className="text-blue-800 dark:text-blue-200">
-                          <p className="mb-2">
-                            Register your account to automatically fill your details and track your attendance history.
-                          </p>
-                          <Link href="/student">
-                            <Button variant="outline" size="sm" className="mt-2">
-                              Register / Login
-                            </Button>
-                          </Link>
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    {student && (
-                      <Alert className="mb-6 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20">
-                        <UserCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                        <AlertTitle className="text-emerald-900 dark:text-emerald-100">Registered Student</AlertTitle>
-                        <AlertDescription className="text-emerald-800 dark:text-emerald-200">
-                          Your details are pre-filled from your registered profile. You can view your attendance history in the{" "}
-                          <Link href="/student" className="underline font-medium">Student Portal</Link>.
-                        </AlertDescription>
-                      </Alert>
-                    )}
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                         <FormField

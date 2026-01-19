@@ -44,6 +44,7 @@ export default function AdminDashboard() {
     login,
     logout,
     sessionActive,
+    activeSession,
     toggleSession,
     records,
     resetSession,
@@ -55,7 +56,12 @@ export default function AdminDashboard() {
     setEnableNotifications
   } = useSystem();
 
-  const [filteredRecords, setFilteredRecords] = useState<AttendanceRecord[]>(records);
+  // Dashboard records (only current session)
+  const dashboardRecords = activeSession
+    ? records.filter(r => r.sessionId === activeSession.id)
+    : [];
+
+  const [filteredRecords, setFilteredRecords] = useState<AttendanceRecord[]>(dashboardRecords);
   const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set());
   const [showSessionDialog, setShowSessionDialog] = useState(false);
   const [sessionName, setSessionName] = useState("");
@@ -148,16 +154,74 @@ export default function AdminDashboard() {
     }
   };
 
+  const exportSpecificSession = async (session: any, type: 'excel' | 'pdf') => {
+    if (!session || !session.records || session.records.length === 0) {
+      toast.error("No records to export for this session");
+      return;
+    }
+
+    try {
+      if (type === 'excel') {
+        const XLSX = await import('xlsx');
+        const worksheet = XLSX.utils.json_to_sheet(session.records.map((r: any) => ({
+          'Name': r.name,
+          'Student ID': r.studentId,
+          'Department': r.department || 'N/A',
+          'Time': format(new Date(r.timestamp), "HH:mm:ss"),
+          'Date': format(new Date(r.timestamp), "yyyy-MM-dd"),
+          'Status': r.status
+        })));
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
+        XLSX.writeFile(workbook, `Attendance_${session.name || 'Session'}_${format(new Date(session.startTime), "yyyy-MM-dd")}.xlsx`);
+        toast.success("Session attendance exported to Excel");
+      } else if (type === 'pdf') {
+        const jsPDF = (await import('jspdf')).default;
+        const autoTable = (await import('jspdf-autotable')).default;
+
+        const doc = new jsPDF();
+        doc.setFontSize(18);
+        doc.text(`Attendance: ${session.name || 'Untitled Session'}`, 14, 22);
+
+        doc.setFontSize(11);
+        doc.text(`Date: ${format(new Date(session.startTime), "MMMM dd, yyyy")}`, 14, 30);
+        doc.text(`Total Present: ${session.records.length}`, 14, 37);
+
+        const tableColumn = ["Name", "ID", "Department", "Time", "Status"];
+        const tableRows = session.records.map((r: any) => [
+          r.name,
+          r.studentId,
+          r.department || 'N/A',
+          format(new Date(r.timestamp), "HH:mm:ss"),
+          r.status
+        ]);
+
+        autoTable(doc, {
+          head: [tableColumn],
+          body: tableRows,
+          startY: 45,
+        });
+
+        doc.save(`Attendance_${session.name || 'Session'}_${format(new Date(session.startTime), "yyyy-MM-dd")}.pdf`);
+        toast.success("Session attendance exported to PDF");
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Failed to export session data");
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated && activeView === "sessions") {
       loadSessions();
     }
   }, [isAuthenticated, activeView]);
 
-  // Update filtered records when records change
+  // Update filtered records when records or activeSession change
   useEffect(() => {
-    setFilteredRecords(records);
-  }, [records]);
+    setFilteredRecords(dashboardRecords);
+  }, [records, activeSession, sessionActive]);
 
   // Load stats
   useEffect(() => {
@@ -467,7 +531,7 @@ export default function AdminDashboard() {
 
         {/* Stats Row */}
         {activeView === "attendance" && (
-          <StatsCards records={records} sessionActive={sessionActive} />
+          <StatsCards records={dashboardRecords} sessionActive={sessionActive} />
         )}
 
         {/* Search and Filter - Only for attendance view */}
@@ -657,11 +721,35 @@ export default function AdminDashboard() {
               <Dialog open={!!selectedSessionForDetails} onOpenChange={(open) => !open && setSelectedSessionForDetails(null)}>
                 <DialogContent className="max-w-3xl">
                   <DialogHeader>
-                    <DialogTitle>{selectedSessionForDetails?.name || "Session Details"}</DialogTitle>
-                    <DialogDescription>
-                      Date: {selectedSessionForDetails && format(new Date(selectedSessionForDetails.startTime), "MMM dd, yyyy")} |
-                      Total: {selectedSessionForDetails?.records?.length || 0} Students
-                    </DialogDescription>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <DialogTitle>{selectedSessionForDetails?.name || "Session Details"}</DialogTitle>
+                        <DialogDescription>
+                          Date: {selectedSessionForDetails && format(new Date(selectedSessionForDetails.startTime), "MMM dd, yyyy")} |
+                          Total: {selectedSessionForDetails?.records?.length || 0} Students
+                        </DialogDescription>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => exportSpecificSession(selectedSessionForDetails, 'excel')}
+                          disabled={!selectedSessionForDetails?.records?.length}
+                        >
+                          <FileSpreadsheet className="h-4 w-4 mr-2" />
+                          Excel
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => exportSpecificSession(selectedSessionForDetails, 'pdf')}
+                          disabled={!selectedSessionForDetails?.records?.length}
+                        >
+                          <FileSpreadsheet className="h-4 w-4 mr-2" />
+                          PDF
+                        </Button>
+                      </div>
+                    </div>
                   </DialogHeader>
                   <ScrollArea className="max-h-[60vh]">
                     <Table>
