@@ -133,15 +133,6 @@ export async function registerRoutes(
 
       const { name, studentId, department, deviceId } = validated.data;
 
-      // Registration Check: Verify student exists in the system
-      const student = await storage.getStudentById(studentId);
-      if (!student) {
-        return res.status(401).json({
-          error: "Not Registered",
-          message: "Your Student ID is not registered. Please register first before submitting attendance."
-        });
-      }
-
       const deviceFingerprint = deviceId || getClientDevice(req);
 
       // Duplicate Check: Look for same Student ID OR same Device Fingerprint in this session
